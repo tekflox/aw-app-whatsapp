@@ -2,8 +2,8 @@
   "manifest_version": 1,
   "id": "whatsapp",
   "name": "WhatsApp",
-  "version": "0.1.0",
-  "description": "Link your own WhatsApp accounts to this workspace by scanning a QR code, then read and send messages from any agent. Several accounts at once — personal, work, a store line — each with its own pairing, its own chats and its own contacts.",
+  "version": "0.2.0",
+  "description": "Link your own WhatsApp accounts to this workspace by scanning a QR code, then read and send messages from any agent. Several accounts at once \u2014 personal, work, a store line \u2014 each with its own pairing, its own chats and its own contacts.",
   "tier": "inprocess",
   "requires_ui_refresh": true,
   "publisher": "TekFlox",
@@ -57,7 +57,7 @@
       {
         "id": "aw-whatsapp",
         "path": "skills/aw-whatsapp/SKILL.md",
-        "description": "Read and send WhatsApp messages from a linked personal account (Baileys), across several accounts at once — account ids, JID shapes, the send throttle, and what to check when nothing is connected."
+        "description": "Read and send WhatsApp messages from a linked personal account (Baileys), across several accounts at once \u2014 account ids, JID shapes, the send throttle, and what to check when nothing is connected."
       }
     ],
     "mcp": {
@@ -83,7 +83,7 @@
       "min_send_interval_ms": {
         "type": "integer",
         "default": 15000,
-        "description": "Minimum gap between two outbound messages on the SAME account. Sending faster than this is what gets a number banned — lower it at your own risk."
+        "description": "Minimum gap between two outbound messages on the SAME account. Sending faster than this is what gets a number banned \u2014 lower it at your own risk."
       },
       "mark_read": {
         "type": "boolean",
