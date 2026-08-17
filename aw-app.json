@@ -1,0 +1,104 @@
+{
+  "manifest_version": 1,
+  "id": "whatsapp",
+  "name": "WhatsApp",
+  "version": "0.1.0",
+  "description": "Link your own WhatsApp accounts to this workspace by scanning a QR code, then read and send messages from any agent. Several accounts at once — personal, work, a store line — each with its own pairing, its own chats and its own contacts.",
+  "tier": "inprocess",
+  "requires_ui_refresh": true,
+  "publisher": "TekFlox",
+  "resource_estimate": {
+    "cpu": "low",
+    "memory": "medium",
+    "disk": "low"
+  },
+  "runtime": {
+    "python": ">=3.11",
+    "entrypoint": "whatsapp_app.plugin:WhatsAppPlugin",
+    "pip_requires": [
+      "httpx>=0.24"
+    ],
+    "standalone": {
+      "module": "whatsapp_app",
+      "default_port": 9410
+    }
+  },
+  "permissions": [
+    "routes:register",
+    "service:manage",
+    "watchdog:tasks",
+    "fs:workspace-data",
+    "net:outbound"
+  ],
+  "contributes": {
+    "routes": [
+      {
+        "prefix": "/api/apps/whatsapp"
+      }
+    ],
+    "windows": [
+      {
+        "id": "whatsapp.main",
+        "title": "WhatsApp",
+        "icon": "message-circle",
+        "body": {
+          "type": "declarative",
+          "spec": "windows/main.json"
+        }
+      }
+    ],
+    "settings_panels": [
+      {
+        "id": "whatsapp.settings",
+        "window": "whatsapp.main"
+      }
+    ],
+    "skills": [
+      {
+        "id": "aw-whatsapp",
+        "path": "skills/aw-whatsapp/SKILL.md",
+        "description": "Read and send WhatsApp messages from a linked personal account (Baileys), across several accounts at once — account ids, JID shapes, the send throttle, and what to check when nothing is connected."
+      }
+    ],
+    "mcp": {
+      "provides": [
+        "whatsapp_list_accounts",
+        "whatsapp_status",
+        "whatsapp_list_conversations",
+        "whatsapp_read_messages",
+        "whatsapp_send_message",
+        "whatsapp_send_media",
+        "whatsapp_download_media"
+      ]
+    }
+  },
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "connector_port": {
+        "type": "integer",
+        "default": 9310,
+        "description": "Localhost port the WhatsApp connector service listens on. Change it only if something else on this workspace already uses it."
+      },
+      "min_send_interval_ms": {
+        "type": "integer",
+        "default": 15000,
+        "description": "Minimum gap between two outbound messages on the SAME account. Sending faster than this is what gets a number banned — lower it at your own risk."
+      },
+      "mark_read": {
+        "type": "boolean",
+        "default": false,
+        "description": "Send read receipts (blue ticks) for messages an agent handles. Off by default: a blue tick tells the sender a human read their message."
+      },
+      "auto_start": {
+        "type": "boolean",
+        "default": true,
+        "description": "Start the connector automatically when the workspace boots."
+      }
+    },
+    "required": []
+  },
+  "config_visible": true,
+  "dependencies": {},
+  "migrations": {}
+}
