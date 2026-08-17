@@ -16,6 +16,8 @@ Ported from the `agentic-workspace` monolith's `whatsapp-connector`
 | `/api/whatsapp/qr.png`, `/api/whatsapp/send` | `/api/apps/whatsapp/accounts/{id}/…` | Nothing is implicit — an account id is a required argument, so "which number did that go from" always has an answer. |
 | QR shown in Settings → AW → Workspace Agent → WhatsApp | Settings panel served as an iframe from `/panel` | Declarative windows have no image widget and no data-bound list; the QR is a live image that rotates every ~20s next to a live account list. |
 | Inbound hard-wired to `POST /api/whatsapp/message` on awserv | Optional per-account `webhook_url` | There is no core WorkspaceAgent route in the decoupled world. Inbound routing is a workspace decision, not the connector's. |
+| stdio MCP server (`src/mcp/whatsapp.py`) | in-process `POST /mcp`, registered by `self_register.py` | The gateway spawns a stdio child inside its OWN container, where `127.0.0.1:9310` is its loopback — the connector would be unreachable and the upstream would serve zero tools while looking healthy. |
+| `whatsapp_send_message(jid, text)` | `account` **required** on sends, optional on reads | Reads default to the single connected account; a send never defaults, because it cannot be recalled. |
 
 Kept verbatim, because each came from a real incident: the **15s minimum send
 interval** and the **duplicate-text refusal** (a WhatsApp number was logged out
@@ -27,7 +29,8 @@ staying **off** by default.
 
 ```
 connector/        Node — index.js (registry + HTTP), account.js (one Baileys socket)
-whatsapp_app/     Python — plugin, routes, ConnectorService, the pairing panel
+whatsapp_app/     Python — plugin, routes, ConnectorService, pairing panel,
+                  mcp_tools.py (7 tools) + self_register.py (gateway upstream)
 windows/main.json declarative window → iframe onto /panel
 skills/aw-whatsapp/  agent-facing contract
 ```

@@ -23,8 +23,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 
 from . import routes as routes_mod
+from . import self_register
 from .service import ConnectorService
 
 log = logging.getLogger("aw_apps.whatsapp")
@@ -38,6 +40,10 @@ class WhatsAppPlugin:
         self.service = ConnectorService(ctx, ctx.package_dir, dict(getattr(ctx, "config", {}) or {}))
 
         ctx.routes.register(routes_mod.build_routes(self.service))
+
+        # Re-run on every activation so a regenerated workspace API key can't
+        # leave the gateway's upstream quietly serving 401s.
+        self_register.register_self(ctx.package_dir, int(os.environ.get("AW_PORT", "9030")))
 
         self._boot = asyncio.create_task(self.service.provision_and_start())
 

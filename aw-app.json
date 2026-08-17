@@ -57,10 +57,11 @@
       {
         "id": "aw-whatsapp",
         "path": "skills/aw-whatsapp/SKILL.md",
-        "description": "Read and send WhatsApp messages from a linked personal account (Baileys), across several accounts at once \u2014 account ids, JID shapes, the send throttle, and what to check when nothing is connected."
+        "description": "Read and send WhatsApp messages across the personal accounts linked to this workspace (Baileys) \u2014 the seven MCP tools, why a send always names its account while a read can default, JID shapes, the throttle and duplicate guard that keep a number un-banned, and what to check when nothing is connected."
       }
     ],
     "mcp": {
+      "reload_on_save": true,
       "provides": [
         "whatsapp_list_accounts",
         "whatsapp_status",
@@ -99,6 +100,15 @@
     "required": []
   },
   "config_visible": true,
-  "dependencies": {},
+  "dependencies": {
+    "apps": [
+      {
+        "id": "mcp-gateway",
+        "version": ">=0.1.0",
+        "required": false,
+        "reason": "Aggregates this app's in-process /mcp endpoint as aw__whatsapp__* so agents can read and send. Non-required: the settings panel, the QR pairing and the REST surface all work without it; only the agent-facing tools go missing."
+      }
+    ]
+  },
   "migrations": {}
 }

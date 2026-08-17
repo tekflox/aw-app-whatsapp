@@ -18,9 +18,10 @@ route shadows anything an app mounts there.
 """
 from __future__ import annotations
 
-from fastapi import Body, FastAPI, HTTPException, Query, Response
+from fastapi import Body, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse
 
+from . import mcp_tools
 from .connector_client import ConnectorDown, ConnectorError
 from .panel_ui import PANEL_HTML
 
@@ -202,5 +203,17 @@ def build_routes(service) -> FastAPI:
             return await service.client.download_media(account_id, message_id)
         except Exception as e:
             raise _http(e)
+
+    # ── MCP (in-process, aggregated by aw-mcp-gateway) ───────────────────────
+    # Registered as an http upstream by self_register.py. Handled here rather
+    # than in a stdio child because the gateway spawns those inside its OWN
+    # container, where 127.0.0.1:9310 is its loopback and not the connector.
+    @app.post("/mcp")
+    async def mcp(request: Request):
+        body = await request.json()
+        response = await mcp_tools.handle_request(service, body)
+        # A JSON-RPC notification has no id and takes no reply; answering one
+        # with a body is a protocol error some clients treat as fatal.
+        return Response(status_code=202) if response is None else response
 
     return app
