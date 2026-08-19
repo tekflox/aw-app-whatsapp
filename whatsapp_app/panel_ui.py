@@ -82,13 +82,22 @@ PANEL_HTML = """<!doctype html>
   button.primary:hover:not(:disabled) { filter: brightness(1.08); }
   button.danger:hover:not(:disabled) { background: rgba(248,113,113,.14);
                         border-color: rgba(248,113,113,.45); color: #f87171; }
+  /* The armed half of the two-click confirm — filled, so "one more click and
+     it's gone" is not something you have to read the label to notice.
+     The :hover variant repeats the whole declaration on purpose: the plain
+     `button.danger:hover:not(:disabled)` rule above is MORE specific than a
+     bare `.danger.confirm`, so without this the armed button washes out to the
+     pale hover style — and it is always hovered, because it appears exactly
+     under the cursor that just clicked Remove. Caught in a screenshot. */
+  button.danger.confirm,
+  button.danger.confirm:hover:not(:disabled) {
+    background: #f87171; border-color: #f87171; color: #2a0808; font-weight: 600; }
+  button.danger.confirm:hover:not(:disabled) { filter: brightness(1.08); }
 
   .qr { margin-top: 10px; padding: 10px; border-radius: 8px; background: #fff;
         text-align: center; }
   .qr img { width: 100%; max-width: 230px; height: auto; display: block; margin: 0 auto;
             image-rendering: pixelated; }
-  .qr-help { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
-  .qr-help ol { margin: 4px 0 0; padding-left: 18px; }
 
   h4 { margin: 16px 0 8px; font-size: 11px; text-transform: uppercase;
        letter-spacing: .05em; color: var(--muted); font-weight: 600; }
@@ -115,17 +124,19 @@ PANEL_HTML = """<!doctype html>
   <input id="new-label" placeholder="e.g. Personal, Store line" maxlength="40">
   <button id="add" class="primary">Add</button>
 </div>
-<div class="sub" style="margin-top:6px">
-  A new account starts disconnected and shows a QR straight away — scan it with
-  the phone that owns that number.
-</div>
 
 <script>
 const BASE = '/api/apps/whatsapp';
 const $ = (id) => document.getElementById(id);
-// Which account's QR is expanded. Auto-set for a freshly added account so the
-// common path (add → scan) is one click, not two.
-let openQr = null;
+// A pending QR shows itself. An account only ever has one because it is waiting
+// to be paired, and the single thing anyone opens this panel to do is scan it —
+// making that cost a click meant the panel's main job was hidden behind a
+// button. This set is the opt-OUT, for when you want the code off the screen.
+const hiddenQr = new Set();
+const qrOpen = (a) => a.has_qr && !hiddenQr.has(a.id);
+// { id, what } while a destructive action is one click from happening — this
+// panel cannot use confirm() (see the note in renderAccounts).
+let confirming = null;
 let busy = false;
 
 async function api(path, init) {
@@ -215,58 +226,96 @@ function renderAccounts(state) {
     const actions = document.createElement('div');
     actions.className = 'actions';
 
-    if (!a.connected && a.enabled) {
+    // A destructive action asks in-place instead of through confirm(). The host
+    // renders this page in a sandbox WITHOUT allow-modals
+    // (aw-workspace-ui AppWindow.jsx: "allow-scripts allow-forms
+    // allow-same-origin"), so window.confirm() is ignored by the browser and
+    // returns false — every `if (!confirm(...)) return;` became an unconditional
+    // return, and Remove/Re-link silently did nothing. Two clicks on the button
+    // itself needs no capability the sandbox withholds.
+    const pending = (id, what) => confirming
+      && confirming.id === id && confirming.what === what;
+
+    const danger = (what, label, run) => {
+      if (pending(a.id, what)) {
+        const yes = document.createElement('button');
+        yes.className = 'danger confirm';
+        yes.textContent = 'Confirm';
+        yes.onclick = () => { confirming = null; run(); };
+        const no = document.createElement('button');
+        no.className = 'ghost';
+        no.textContent = 'Cancel';
+        no.onclick = () => { confirming = null; refresh(); };
+        actions.append(yes, no);
+        return;
+      }
+      const b = document.createElement('button');
+      b.className = 'danger';
+      b.textContent = label;
+      b.onclick = () => { confirming = { id: a.id, what }; refresh(); };
+      actions.appendChild(b);
+    };
+
+    if (a.has_qr) {
       const qr = document.createElement('button');
-      qr.className = openQr === a.id ? '' : 'primary';
-      qr.textContent = openQr === a.id ? 'Hide QR' : 'Show QR';
-      qr.onclick = () => { openQr = openQr === a.id ? null : a.id; refresh(); };
+      qr.textContent = qrOpen(a) ? 'Hide QR' : 'Show QR';
+      qr.onclick = () => {
+        if (hiddenQr.has(a.id)) hiddenQr.delete(a.id); else hiddenQr.add(a.id);
+        refresh();
+      };
       actions.appendChild(qr);
     }
-    if (a.connected) {
-      const rl = document.createElement('button');
-      rl.textContent = 'Re-link';
-      rl.title = 'Unlink this device and show a fresh QR';
-      rl.onclick = () => {
-        if (!confirm('Unlink "' + a.label + '" and show a new QR?')) return;
-        openQr = a.id;
-        act(() => api('/accounts/' + a.id + '/relink', { method: 'POST' }));
-      };
-      actions.appendChild(rl);
-    }
+
     const toggle = document.createElement('button');
     toggle.textContent = a.enabled ? 'Pause' : 'Resume';
     toggle.onclick = () => act(() =>
       api('/accounts/' + a.id + (a.enabled ? '/stop' : '/start'), { method: 'POST' }));
     actions.appendChild(toggle);
 
-    const del = document.createElement('button');
-    del.className = 'danger';
-    del.textContent = 'Remove';
-    del.onclick = () => {
-      if (!confirm('Remove "' + a.label + '"? This unlinks it and deletes its local history.')) return;
-      if (openQr === a.id) openQr = null;
+    if (a.connected) {
+      danger('relink', 'Re-link', () => {
+        hiddenQr.delete(a.id);   // the new QR is the point of re-linking
+        act(() => api('/accounts/' + a.id + '/relink', { method: 'POST' }));
+      });
+    }
+    danger('remove', 'Remove', () => {
+      hiddenQr.delete(a.id);
       act(() => api('/accounts/' + a.id, { method: 'DELETE' }));
-    };
-    actions.appendChild(del);
+    });
     card.appendChild(actions);
 
-    if (openQr === a.id) card.appendChild(qrBlock(a));
+    if (pending(a.id, 'relink')) card.appendChild(hint(
+      'Unlinks this device from the phone and shows a new QR.'));
+    if (pending(a.id, 'remove')) card.appendChild(hint(
+      'Unlinks this device and deletes its local history.'));
+
+    if (qrOpen(a)) card.appendChild(qrBlock(a));
     list.appendChild(card);
   }
 }
 
+function hint(text) {
+  const el = document.createElement('div');
+  el.className = 'note';
+  el.textContent = text;
+  return el;
+}
+
+// The QR pane is the image and nothing else. The step-by-step "open WhatsApp →
+// Linked devices → Link a device" list that used to sit under it is what
+// everyone already does on reflex when a QR appears, and in a 320px-tall
+// settings box it pushed the code itself out of view.
 function qrBlock(a) {
-  const box = document.createElement('div');
   if (!a.has_qr) {
-    box.className = 'qr-help';
-    box.textContent = a.connected
-      ? 'Already linked — nothing to scan.'
-      : 'Waiting for WhatsApp to hand out a pairing code…';
-    const s = document.createElement('span');
-    s.className = 'spin'; s.style.marginLeft = '6px';
-    if (!a.connected) box.appendChild(s);
+    const box = hint(a.connected ? 'Already linked.' : 'Waiting for a pairing code…');
+    if (!a.connected) {
+      const s = document.createElement('span');
+      s.className = 'spin'; s.style.marginLeft = '6px';
+      box.appendChild(s);
+    }
     return box;
   }
+  const box = document.createElement('div');
   box.className = 'qr';
   const img = document.createElement('img');
   // Cache-buster keyed to the QR's own generation time: WhatsApp rotates the
@@ -275,14 +324,6 @@ function qrBlock(a) {
   img.src = BASE + '/accounts/' + a.id + '/qr.png?v=' + (a.qr_generated_at || Date.now());
   img.alt = 'WhatsApp pairing QR';
   box.appendChild(img);
-
-  const help = document.createElement('div');
-  help.className = 'qr-help';
-  help.innerHTML = 'On the phone that owns this number:<ol>' +
-    '<li>WhatsApp → <b>Settings</b> → <b>Linked devices</b></li>' +
-    '<li><b>Link a device</b></li>' +
-    '<li>Point the camera here</li></ol>';
-  box.appendChild(help);
   return box;
 }
 
@@ -327,11 +368,8 @@ $('add').onclick = () => {
   const label = $('new-label').value.trim();
   if (!label) { showErr('Give the account a name first.'); return; }
   act(async () => {
-    const created = await api('/accounts', {
-      method: 'POST', body: JSON.stringify({ label }),
-    });
+    await api('/accounts', { method: 'POST', body: JSON.stringify({ label }) });
     $('new-label').value = '';
-    openQr = created.id;   // straight to the QR — that's why they clicked Add
   });
 };
 $('new-label').addEventListener('keydown', (e) => {

@@ -109,6 +109,19 @@ def test_panel_is_html_and_not_under_ui(env):
     assert "/ui/" not in "/api/apps/whatsapp/panel"
 
 
+def test_panel_never_calls_confirm_or_alert():
+    import re
+    from whatsapp_app.panel_ui import PANEL_HTML
+    # The host renders this page in a sandbox without allow-modals
+    # (aw-workspace-ui AppWindow.jsx: "allow-scripts allow-forms
+    # allow-same-origin"). confirm() is ignored by the browser and returns
+    # false, so `if (!confirm(...)) return;` becomes an unconditional return —
+    # which is exactly how Remove and Re-link shipped doing nothing.
+    code = re.sub(r"^\s*//.*$", "", PANEL_HTML, flags=re.MULTILINE)  # comments may name them
+    for banned in ("confirm(", "alert(", "prompt("):
+        assert banned not in code, f"{banned} silently does nothing in this sandbox"
+
+
 def test_state_reports_accounts(env):
     _, client = env
     body = client.get("/api/apps/whatsapp/state").json()

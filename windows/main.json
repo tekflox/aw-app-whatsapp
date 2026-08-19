@@ -5,10 +5,6 @@
       "id": "accounts",
       "widgets": [
         {
-          "type": "markdown",
-          "value": "## WhatsApp accounts\nLink one or more WhatsApp numbers to this workspace by scanning a QR with the phone that owns each number. Each account keeps its own pairing, chats and contacts — agents address them by account id."
-        },
-        {
           "type": "iframe",
           "src": "/api/apps/whatsapp/panel"
         }
