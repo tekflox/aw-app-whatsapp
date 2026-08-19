@@ -191,3 +191,30 @@ def test_messages_route_is_account_scoped(env):
     # come back by accident, because it would silently pick an account.
     assert client.get("/api/apps/whatsapp/messages",
                       params={"jid": "x@s.whatsapp.net"}).status_code == 404
+
+
+def test_panel_javascript_actually_parses():
+    """The panel's JS lives inside a Python string, so nothing type-checks it.
+
+    A broken edit produces a page that loads, renders its static HTML, and runs
+    none of its script — no console error a Python test can see, just an empty
+    list. Exactly what a leading '+' inside a ternary did while patching out
+    confirm(). node --check is the cheapest real parser available.
+    """
+    import re, shutil, subprocess, tempfile, os
+    from whatsapp_app.panel_ui import PANEL_HTML
+
+    node = shutil.which("node")
+    if not node:
+        import pytest
+        pytest.skip("node not available")
+    js = re.search(r"<script>(.*?)</script>", PANEL_HTML, re.S)
+    assert js, "panel has no <script> block"
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+        f.write(js.group(1))
+        path = f.name
+    try:
+        proc = subprocess.run([node, "--check", path], capture_output=True, text=True)
+        assert proc.returncode == 0, proc.stderr
+    finally:
+        os.unlink(path)
