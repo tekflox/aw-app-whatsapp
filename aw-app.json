@@ -6,6 +6,7 @@
   "description": "Link your own WhatsApp accounts to this workspace by scanning a QR code, then read and send messages from any agent. Several accounts at once \u2014 personal, work, a store line \u2014 each with its own pairing, its own chats and its own contacts.",
   "tier": "inprocess",
   "category": "Services",
+  "icon": "message-circle",
   "requires_ui_refresh": true,
   "publisher": "TekFlox",
   "resource_estimate": {
